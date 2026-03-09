@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "switchbox"
+name = "switchbox-flags"
 version = "0.1.0"
 description = "Feature flag SDK with zero dependencies"
 readme = "README.md"
@@ -21,9 +21,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/switchbox-oss/switchbox-sdk-python"
-Repository = "https://github.com/switchbox-oss/switchbox-sdk-python"
-Issues = "https://github.com/switchbox-oss/switchbox-sdk-python/issues"
+Homepage = "https://github.com/ignat14/switchbox-sdk-python"
+Repository = "https://github.com/ignat14/switchbox-sdk-python"
+Issues = "https://github.com/ignat14/switchbox-sdk-python/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

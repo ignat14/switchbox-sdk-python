@@ -5,7 +5,7 @@ Feature flag SDK for Python. Zero dependencies. Reads configs from a CDN.
 ## Install
 
 ```
-pip install switchbox
+pip install switchbox-flags
 ```
 
 ## Quick start
