@@ -25,6 +25,9 @@ Homepage = "https://github.com/ignat14/switchbox-sdk-python"
 Repository = "https://github.com/ignat14/switchbox-sdk-python"
 Issues = "https://github.com/ignat14/switchbox-sdk-python/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["switchbox"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
