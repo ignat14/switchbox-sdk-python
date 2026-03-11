@@ -4,6 +4,8 @@ from switchbox.cache import FlagCache
 from switchbox.evaluator import evaluate
 from switchbox.sync import SyncWorker
 
+CDN_BASE_URL = "https://pub-4521fa0daff443158908bf84708a5e8f.r2.dev"
+
 
 class Client:
     """Switchbox feature flag client.
@@ -12,25 +14,29 @@ class Client:
 
     Usage::
 
-        client = Client(cdn_url="https://cdn.example.com/proj/production/flags.json")
+        client = Client(project_id="your-project-id", environment="production")
         if client.enabled("new_feature", user={"user_id": "42"}):
             ...
         client.close()
 
     Or as a context manager::
 
-        with Client(cdn_url="...") as client:
+        with Client(project_id="...", environment="production") as client:
             if client.enabled("new_feature"):
                 ...
     """
 
     def __init__(
         self,
-        cdn_url: str,
+        project_id: str,
+        environment: str,
         poll_interval: int = 30,
         on_error: Callable[[Exception], None] | None = None,
         timeout: int = 10,
+        cdn_base_url: str | None = None,
     ) -> None:
+        base = cdn_base_url or CDN_BASE_URL
+        cdn_url = f"{base}/{project_id}/{environment}/flags.json"
         self._cache = FlagCache()
         self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error, timeout=timeout)
         self._sync.start()
