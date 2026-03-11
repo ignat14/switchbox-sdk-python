@@ -21,35 +21,38 @@ def evaluate(flag: Flag, user_context: dict | None = None) -> bool | str | int |
     4. Rollout percentage check → enabled value or default_value
     5. Nothing matched → default_value
     """
-    # 1. Disabled flag always returns default
-    if not flag.enabled:
-        return flag.default_value
+    try:
+        # 1. Disabled flag always returns default
+        if not flag.enabled:
+            return flag.default_value
 
-    # 2. No user context
-    if not user_context:
-        if flag.rollout_pct == 100:
-            return _enabled_value(flag)
-        return flag.default_value
-
-    # 3. Check rules (OR logic — any match wins)
-    if flag.rules:
-        for rule in flag.rules:
-            if _match_rule(rule, user_context):
+        # 2. No user context
+        if not user_context:
+            if flag.rollout_pct == 100:
                 return _enabled_value(flag)
+            return flag.default_value
 
-    # 4. Rollout percentage
-    user_id = user_context.get("user_id") or user_context.get("id")
-    if user_id is not None:
-        if _check_rollout(str(user_id), flag.key, flag.rollout_pct):
-            return _enabled_value(flag)
-    else:
-        # No user ID for hashing — can only serve 100% rollouts
-        if flag.rollout_pct == 100:
-            return _enabled_value(flag)
+        # 3. Check rules (OR logic — any match wins)
+        if flag.rules:
+            for rule in flag.rules:
+                if _match_rule(rule, user_context):
+                    return _enabled_value(flag)
+
+        # 4. Rollout percentage
+        user_id = user_context.get("user_id") or user_context.get("id")
+        if user_id is not None:
+            if _check_rollout(str(user_id), flag.key, flag.rollout_pct):
+                return _enabled_value(flag)
+        else:
+            # No user ID for hashing — can only serve 100% rollouts
+            if flag.rollout_pct == 100:
+                return _enabled_value(flag)
+            return flag.default_value
+
+        # 5. Nothing matched
         return flag.default_value
-
-    # 5. Nothing matched
-    return flag.default_value
+    except Exception:
+        return flag.default_value
 
 
 def _enabled_value(flag: Flag) -> bool | str | int | Any:
@@ -65,6 +68,9 @@ def _match_rule(rule: Rule, user_context: dict) -> bool:
         return False
 
     context_value = user_context[rule.attribute]
+
+    if context_value is None:
+        return False
 
     if rule.operator == "equals":
         return str(context_value) == str(rule.value)

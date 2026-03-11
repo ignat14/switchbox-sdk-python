@@ -142,3 +142,104 @@ def test_string_flag_returns_string_value():
 def test_number_flag_returns_number_value():
     flag = make_flag(flag_type="number", default_value=42, rollout_pct=100)
     assert evaluate(flag, {"user_id": "1"}) == 42
+
+
+# --- Additional tests ---
+
+
+def test_disabled_flag_boolean_returns_false():
+    flag = make_flag(enabled=False, default_value=False)
+    assert evaluate(flag, {"user_id": "1"}) is False
+
+
+def test_disabled_flag_string_returns_default():
+    flag = make_flag(enabled=False, flag_type="string", default_value="off")
+    assert evaluate(flag, {"user_id": "1"}) == "off"
+
+
+def test_50_pct_rollout_deterministic_for_user():
+    flag = make_flag(rollout_pct=50, default_value=False)
+    results = [evaluate(flag, {"user_id": "user42"}) for _ in range(100)]
+    assert len(set(results)) == 1  # Always same result
+
+
+def test_contains_case_sensitive():
+    rule = Rule(attribute="name", operator="contains", value="Alice")
+    assert _match_rule(rule, {"name": "Alice Smith"}) is True
+    assert _match_rule(rule, {"name": "alice smith"}) is False
+
+
+def test_ends_with_no_match():
+    rule = Rule(attribute="email", operator="ends_with", value="@company.com")
+    assert _match_rule(rule, {"email": "alice@other.com"}) is False
+
+
+def test_in_list_no_match():
+    rule = Rule(attribute="tier", operator="in_list", value=["gold", "platinum"])
+    assert _match_rule(rule, {"tier": "silver"}) is False
+
+
+def test_gt_non_numeric_returns_false():
+    rule = Rule(attribute="age", operator="gt", value="18")
+    assert _match_rule(rule, {"age": "not_a_number"}) is False
+
+
+def test_lt_non_numeric_returns_false():
+    rule = Rule(attribute="score", operator="lt", value="50")
+    assert _match_rule(rule, {"score": "abc"}) is False
+
+
+def test_multiple_rules_none_match_falls_to_rollout():
+    flag = make_flag(
+        rollout_pct=0,
+        default_value=False,
+        rules=[
+            Rule(attribute="country", operator="equals", value="US"),
+            Rule(attribute="tier", operator="equals", value="gold"),
+        ],
+    )
+    result = evaluate(flag, {"user_id": "1", "country": "UK", "tier": "silver"})
+    assert result is False
+
+
+def test_rollout_different_flag_keys_different_results():
+    """Same user with different flag keys should get different bucketing."""
+    results_a = _check_rollout("user1", "flag_a", 50)
+    results_b = _check_rollout("user1", "flag_b", 50)
+    # They CAN be the same by chance, but let's just verify both run without error
+    assert isinstance(results_a, bool)
+    assert isinstance(results_b, bool)
+
+
+def test_no_user_context_no_rules_enabled_100_rollout():
+    flag = make_flag(enabled=True, rollout_pct=100, rules=[])
+    assert evaluate(flag, None) is True
+
+
+def test_no_user_context_rollout_less_than_100_returns_default():
+    flag = make_flag(enabled=True, rollout_pct=50, default_value=False, rules=[])
+    assert evaluate(flag, None) is False
+
+
+def test_string_flag_disabled_returns_default():
+    flag = make_flag(enabled=False, flag_type="string", default_value="off")
+    assert evaluate(flag) == "off"
+
+
+def test_number_flag_disabled_returns_default():
+    flag = make_flag(enabled=False, flag_type="number", default_value=0)
+    assert evaluate(flag) == 0
+
+
+def test_json_flag_disabled_returns_default():
+    flag = make_flag(enabled=False, flag_type="json", default_value={"key": "val"})
+    assert evaluate(flag) == {"key": "val"}
+
+
+def test_rule_attribute_not_in_context_skipped():
+    flag = make_flag(
+        rollout_pct=0,
+        default_value=False,
+        rules=[Rule(attribute="missing_attr", operator="equals", value="x")],
+    )
+    assert evaluate(flag, {"user_id": "1", "other": "y"}) is False

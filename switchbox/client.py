@@ -29,10 +29,16 @@ class Client:
         cdn_url: str,
         poll_interval: int = 30,
         on_error: Callable[[Exception], None] | None = None,
+        timeout: int = 10,
     ) -> None:
         self._cache = FlagCache()
-        self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error)
+        self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error, timeout=timeout)
         self._sync.start()
+
+    @property
+    def ready(self) -> bool:
+        """Return True when configs have been loaded at least once."""
+        return self._cache.get_config() is not None
 
     def enabled(self, flag_key: str, user: dict | None = None) -> bool:
         """Check if a boolean flag is enabled for a user.

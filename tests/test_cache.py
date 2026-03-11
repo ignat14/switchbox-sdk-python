@@ -79,3 +79,9 @@ def test_thread_safety():
         t.join()
 
     assert errors == []
+
+
+def test_get_version_returns_version():
+    cache = FlagCache()
+    cache.set_config(_make_config(version="2026-01-01T00:00:00Z"))
+    assert cache.get_version() == "2026-01-01T00:00:00Z"
