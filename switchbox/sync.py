@@ -74,37 +74,21 @@ class SyncWorker:
             logger.debug("Updated flag config to version %s", config.version)
 
         except urllib.error.HTTPError as exc:
-            logger.warning("HTTP error fetching flag config from %s: %s %s", self._cdn_url, exc.code, exc.reason)
-            if self._on_error is not None:
-                try:
-                    self._on_error(ConfigFetchError(str(exc)))
-                except Exception:
-                    pass
+            self._handle_error(f"HTTP error {exc.code} {exc.reason}", exc)
         except urllib.error.URLError as exc:
-            logger.warning("URL error fetching flag config from %s: %s", self._cdn_url, exc.reason)
-            if self._on_error is not None:
-                try:
-                    self._on_error(ConfigFetchError(str(exc)))
-                except Exception:
-                    pass
+            self._handle_error(f"URL error: {exc.reason}", exc)
         except json.JSONDecodeError as exc:
-            logger.warning("Invalid JSON in flag config from %s: %s", self._cdn_url, exc)
-            if self._on_error is not None:
-                try:
-                    self._on_error(ConfigFetchError(str(exc)))
-                except Exception:
-                    pass
+            self._handle_error(f"Invalid JSON: {exc}", exc)
         except TimeoutError as exc:
-            logger.warning("Timeout fetching flag config from %s: %s", self._cdn_url, exc)
-            if self._on_error is not None:
-                try:
-                    self._on_error(ConfigFetchError(str(exc)))
-                except Exception:
-                    pass
+            self._handle_error(f"Timeout: {exc}", exc)
         except Exception as exc:
-            logger.warning("Failed to fetch flag config from %s: %s", self._cdn_url, exc)
-            if self._on_error is not None:
-                try:
-                    self._on_error(ConfigFetchError(str(exc)))
-                except Exception:
-                    pass
+            self._handle_error(str(exc), exc)
+
+    def _handle_error(self, message: str, exc: Exception) -> None:
+        """Log a fetch error and notify the on_error callback if set."""
+        logger.warning("Failed to fetch flag config from %s: %s", self._cdn_url, message)
+        if self._on_error is not None:
+            try:
+                self._on_error(ConfigFetchError(str(exc)))
+            except Exception:
+                pass
