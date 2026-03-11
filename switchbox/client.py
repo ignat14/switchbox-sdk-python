@@ -4,7 +4,7 @@ from switchbox.cache import FlagCache
 from switchbox.evaluator import evaluate
 from switchbox.sync import SyncWorker
 
-CDN_BASE_URL = "https://pub-4521fa0daff443158908bf84708a5e8f.r2.dev"
+CDN_BASE_URL = "https://cdn.switchbox.dev"
 
 
 class Client:
