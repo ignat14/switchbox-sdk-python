@@ -21,7 +21,7 @@ pip install switchbox-flags
 ```python
 from switchbox import Client
 
-client = Client(cdn_url="https://cdn.switchbox.dev/proj_abc/production/flags.json")
+client = Client(sdk_key="your-sdk-key-from-dashboard")
 
 if client.enabled("new_checkout", user={"user_id": "42"}):
     show_new_checkout()
@@ -46,7 +46,7 @@ client.close()
 ```python
 from switchbox import Client
 
-client = Client(cdn_url="https://cdn.switchbox.dev/proj_abc/production/flags.json")
+client = Client(sdk_key="your-sdk-key-from-dashboard")
 
 if client.enabled("dark_mode"):
     enable_dark_mode()
@@ -116,7 +116,7 @@ If the SDK has never successfully fetched a config (e.g., CDN is down on first s
 ### Context Manager
 
 ```python
-with Client(cdn_url="https://cdn.switchbox.dev/proj_abc/production/flags.json") as client:
+with Client(sdk_key="your-sdk-key-from-dashboard") as client:
     if client.enabled("new_checkout", user={"user_id": "42"}):
         show_new_checkout()
 # client.close() is called automatically
@@ -126,17 +126,19 @@ with Client(cdn_url="https://cdn.switchbox.dev/proj_abc/production/flags.json") 
 
 ```python
 client = Client(
-    cdn_url="https://cdn.switchbox.dev/proj_abc/production/flags.json",  # required
-    poll_interval=60,                    # seconds between polls (default: 30)
-    on_error=lambda e: logger.warning(e),  # called on fetch errors (default: None)
+    sdk_key="your-sdk-key-from-dashboard",  # required — get from Environments tab
+    poll_interval=60,                       # seconds between polls (default: 30)
+    on_error=lambda e: logger.warning(e),   # called on fetch errors (default: None)
 )
 ```
 
 | Parameter       | Type                           | Default | Description                                    |
 |-----------------|--------------------------------|---------|------------------------------------------------|
-| `cdn_url`       | `str`                          | —       | URL to the CDN-hosted flags JSON file          |
+| `sdk_key`       | `str`                          | —       | SDK key from the environment in the dashboard  |
 | `poll_interval` | `int`                          | `30`    | Seconds between background config refreshes    |
 | `on_error`      | `Callable[[Exception], None]`  | `None`  | Callback invoked when a fetch or parse fails   |
+
+The SDK builds the CDN URL automatically from the SDK key. You can override with `cdn_base_url` if self-hosting.
 
 ## How It Works
 
@@ -170,7 +172,7 @@ The API server is only in the write path. All read traffic goes to the CDN.
 
 ## API Reference
 
-### `Client(cdn_url, poll_interval=30, on_error=None)`
+### `Client(sdk_key, poll_interval=30, on_error=None)`
 
 Creates a new client. Performs an initial synchronous fetch on creation, then starts background polling.
 
