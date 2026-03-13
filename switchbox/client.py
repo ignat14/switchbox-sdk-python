@@ -14,29 +14,28 @@ class Client:
 
     Usage::
 
-        client = Client(project_id="your-project-id", environment="production")
+        client = Client(sdk_key="your-sdk-key")
         if client.enabled("new_feature", user={"user_id": "42"}):
             ...
         client.close()
 
     Or as a context manager::
 
-        with Client(project_id="...", environment="production") as client:
+        with Client(sdk_key="your-sdk-key") as client:
             if client.enabled("new_feature"):
                 ...
     """
 
     def __init__(
         self,
-        project_id: str,
-        environment: str,
+        sdk_key: str,
         poll_interval: int = 30,
         on_error: Callable[[Exception], None] | None = None,
         timeout: int = 10,
         cdn_base_url: str | None = None,
     ) -> None:
         base = cdn_base_url or CDN_BASE_URL
-        cdn_url = f"{base}/{project_id}/{environment}/flags.json"
+        cdn_url = f"{base}/{sdk_key}/flags.json"
         self._cache = FlagCache()
         self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error, timeout=timeout)
         self._sync.start()
