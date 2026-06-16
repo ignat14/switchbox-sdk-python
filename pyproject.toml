@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "switchbox-flags"
-version = "0.2.0"
+version = "0.3.0"
 description = "Feature flag SDK with zero dependencies"
 readme = "README.md"
 license = "MIT"

@@ -58,7 +58,7 @@ class SyncWorker:
         try:
             req = urllib.request.Request(
                 self._cdn_url,
-                headers={"User-Agent": "switchbox-python/0.1.0"},
+                headers={"User-Agent": "switchbox-python/0.3.0"},
             )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))

@@ -1,0 +1,33 @@
+{
+  "_comment": "SEC-4 cross-SDK parity vectors. This file MUST be byte-identical to switchbox-sdk-js/packages/core/tests/parity_vectors.json — it is duplicated into each repo because each SDK is built/tested by its own CI. Canonical semantics are JS-style: lowercase booleans (String(true)='true'), parseFloat-style prefix numeric parsing, null coerces to 'null', user_id resolved with ??-style null-only fallback, and a user context lacking a usable id serves only 100% rollouts (ADR-008). See DECISIONS.md ADR-013. When you change one copy, change the other and run both suites.",
+  "rule_match": [
+    {"name": "boolean true matches lowercase 'true'", "rule": {"attribute": "is_beta", "operator": "equals", "value": "true"}, "context": {"is_beta": true}, "expected": true},
+    {"name": "boolean false matches lowercase 'false'", "rule": {"attribute": "is_beta", "operator": "equals", "value": "false"}, "context": {"is_beta": false}, "expected": true},
+    {"name": "boolean true does not match 'True' (no Python-style capitalization)", "rule": {"attribute": "is_beta", "operator": "equals", "value": "True"}, "context": {"is_beta": true}, "expected": false},
+    {"name": "boolean true not_equals 'false'", "rule": {"attribute": "is_beta", "operator": "not_equals", "value": "false"}, "context": {"is_beta": true}, "expected": true},
+    {"name": "integer-valued float coerces without trailing .0", "rule": {"attribute": "price", "operator": "equals", "value": "42"}, "context": {"price": 42.0}, "expected": true},
+    {"name": "null context value coerces to the string 'null'", "rule": {"attribute": "ref", "operator": "equals", "value": "null"}, "context": {"ref": null}, "expected": true},
+    {"name": "absent attribute never matches", "rule": {"attribute": "missing", "operator": "equals", "value": "x"}, "context": {"other": "x"}, "expected": false},
+    {"name": "contains substring", "rule": {"attribute": "email", "operator": "contains", "value": "company"}, "context": {"email": "a@company.com"}, "expected": true},
+    {"name": "ends_with suffix", "rule": {"attribute": "email", "operator": "ends_with", "value": "@company.com"}, "context": {"email": "a@company.com"}, "expected": true},
+    {"name": "gt with non-numeric suffix (parseFloat prefix parse)", "rule": {"attribute": "age", "operator": "gt", "value": "18"}, "context": {"age": "25px"}, "expected": true},
+    {"name": "gt prefix parse below threshold", "rule": {"attribute": "v", "operator": "gt", "value": "18"}, "context": {"v": "5px"}, "expected": false},
+    {"name": "gt with fully non-numeric string is NaN -> false", "rule": {"attribute": "v", "operator": "gt", "value": "1"}, "context": {"v": "abc"}, "expected": false},
+    {"name": "gt with boolean context is NaN -> false (parseFloat('true'))", "rule": {"attribute": "flag", "operator": "gt", "value": "0"}, "context": {"flag": true}, "expected": false},
+    {"name": "lt numeric", "rule": {"attribute": "age", "operator": "lt", "value": "18"}, "context": {"age": "5"}, "expected": true},
+    {"name": "in_list string member matches", "rule": {"attribute": "country", "operator": "in_list", "value": ["US", "CA", "UK"]}, "context": {"country": "US"}, "expected": true},
+    {"name": "in_list stringified number does not match raw number item (shared footgun)", "rule": {"attribute": "n", "operator": "in_list", "value": [42]}, "context": {"n": 42}, "expected": false},
+    {"name": "in_list stringified number matches string item", "rule": {"attribute": "n", "operator": "in_list", "value": ["42"]}, "context": {"n": 42}, "expected": true}
+  ],
+  "evaluate": [
+    {"name": "disabled flag returns default", "flag_key": "f", "flag": {"enabled": false, "rollout_pct": 100, "flag_type": "boolean", "default_value": "off", "rules": []}, "user": {"user_id": "1"}, "expected": "off"},
+    {"name": "no user context, rollout 100 -> enabled", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "boolean", "default_value": false, "rules": []}, "user": null, "expected": true},
+    {"name": "no user context, rollout 50 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 50, "flag_type": "boolean", "default_value": false, "rules": []}, "user": null, "expected": false},
+    {"name": "rule match beats rollout 0", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 0, "flag_type": "boolean", "default_value": false, "rules": [{"attribute": "plan", "operator": "equals", "value": "pro"}]}, "user": {"plan": "pro"}, "expected": true},
+    {"name": "boolean-coercion rule matches end to end", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 0, "flag_type": "boolean", "default_value": false, "rules": [{"attribute": "is_beta", "operator": "equals", "value": "true"}]}, "user": {"is_beta": true}, "expected": true},
+    {"name": "has user_id, rollout 0, no match -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 0, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "x"}, "expected": false},
+    {"name": "user context without id, rollout 100 -> enabled (ADR-008)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"plan": "pro"}, "expected": true},
+    {"name": "user context without id, rollout 50 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 50, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"plan": "pro"}, "expected": false},
+    {"name": "empty-string user_id is treated as present (rollout 100)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "", "id": "ignored"}, "expected": true}
+  ]
+}
