@@ -47,16 +47,23 @@ class Client:
         """Return True when configs have been loaded at least once."""
         return self._cache.get_config() is not None
 
+    def _eval_flag(self, flag_key: str, user: dict | None, fallback: Any) -> Any:
+        """Look up a flag and evaluate it, returning *fallback* if it's absent.
+
+        The shared path behind enabled()/get_value() — they differ only in
+        their fallback and how they coerce the result.
+        """
+        flag = self._cache.get_flag(flag_key)
+        if flag is None:
+            return fallback
+        return evaluate(flag, user)
+
     def enabled(self, flag_key: str, user: dict | None = None) -> bool:
         """Check if a boolean flag is enabled for a user.
 
         Returns False if the flag doesn't exist (safe default).
         """
-        flag = self._cache.get_flag(flag_key)
-        if flag is None:
-            return False
-        result = evaluate(flag, user)
-        return bool(result)
+        return bool(self._eval_flag(flag_key, user, False))
 
     def get_value(
         self, flag_key: str, user: dict | None = None, default: Any = None
@@ -65,10 +72,7 @@ class Client:
 
         Returns *default* if the flag doesn't exist.
         """
-        flag = self._cache.get_flag(flag_key)
-        if flag is None:
-            return default
-        return evaluate(flag, user)
+        return self._eval_flag(flag_key, user, default)
 
     def get_all_flags(self, user: dict | None = None) -> dict[str, Any]:
         """Get all flag values resolved for a user."""
