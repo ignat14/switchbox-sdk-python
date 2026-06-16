@@ -19,9 +19,9 @@ pip install switchbox-flags
 ## Quick Start
 
 ```python
-from switchbox import Client
+from switchbox import Switchbox
 
-client = Client(sdk_key="your-sdk-key-from-dashboard")
+client = Switchbox(sdk_key="your-sdk-key-from-dashboard")
 
 if client.enabled("new_checkout", user={"user_id": "42"}):
     show_new_checkout()
@@ -37,16 +37,16 @@ client.close()
 - **Background polling** — syncs configs every 30 seconds (configurable)
 - **Offline resilient** — keeps working on cached configs if the CDN is unreachable
 - **Thread-safe** — safe to use from multiple threads
-- **Context manager** — supports `with Client(...) as client:` for automatic cleanup
+- **Context manager** — supports `with Switchbox(...) as client:` for automatic cleanup
 
 ## Usage
 
 ### Boolean Flags
 
 ```python
-from switchbox import Client
+from switchbox import Switchbox
 
-client = Client(sdk_key="your-sdk-key-from-dashboard")
+client = Switchbox(sdk_key="your-sdk-key-from-dashboard")
 
 if client.enabled("dark_mode"):
     enable_dark_mode()
@@ -116,7 +116,7 @@ If the SDK has never successfully fetched a config (e.g., CDN is down on first s
 ### Context Manager
 
 ```python
-with Client(sdk_key="your-sdk-key-from-dashboard") as client:
+with Switchbox(sdk_key="your-sdk-key-from-dashboard") as client:
     if client.enabled("new_checkout", user={"user_id": "42"}):
         show_new_checkout()
 # client.close() is called automatically
@@ -125,7 +125,7 @@ with Client(sdk_key="your-sdk-key-from-dashboard") as client:
 ## Configuration
 
 ```python
-client = Client(
+client = Switchbox(
     sdk_key="your-sdk-key-from-dashboard",  # required — get from Environments tab
     poll_interval=60,                       # seconds between polls (default: 30)
     on_error=lambda e: logger.warning(e),   # called on fetch errors (default: None)
@@ -172,7 +172,7 @@ The API server is only in the write path. All read traffic goes to the CDN.
 
 ## API Reference
 
-### `Client(sdk_key, poll_interval=30, on_error=None)`
+### `Switchbox(sdk_key, poll_interval=30, on_error=None)`
 
 Creates a new client. Performs an initial synchronous fetch on creation, then starts background polling.
 

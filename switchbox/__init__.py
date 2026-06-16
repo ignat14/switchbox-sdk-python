@@ -1,5 +1,5 @@
-from switchbox.client import Client
+from switchbox.client import Switchbox
 from switchbox.exceptions import SwitchboxError
 
-__version__ = "0.1.0"
-__all__ = ["Client", "SwitchboxError"]
+__version__ = "0.4.0"
+__all__ = ["Switchbox", "SwitchboxError"]

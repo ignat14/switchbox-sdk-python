@@ -9,21 +9,21 @@ from switchbox.sync import SyncWorker
 CDN_BASE_URL = "https://cdn.switchbox.dev"
 
 
-class Client:
+class Switchbox:
     """Switchbox feature flag client.
 
     Fetches flag configs from a CDN and evaluates them locally.
 
     Usage::
 
-        client = Client(sdk_key="your-sdk-key")
+        client = Switchbox(sdk_key="your-sdk-key")
         if client.enabled("new_feature", user={"user_id": "42"}):
             ...
         client.close()
 
     Or as a context manager::
 
-        with Client(sdk_key="your-sdk-key") as client:
+        with Switchbox(sdk_key="your-sdk-key") as client:
             if client.enabled("new_feature"):
                 ...
     """
@@ -85,7 +85,7 @@ class Client:
         """Stop the background sync. Call on shutdown."""
         self._sync.stop()
 
-    def __enter__(self) -> Client:
+    def __enter__(self) -> Switchbox:
         return self
 
     def __exit__(self, *args: object) -> None:
