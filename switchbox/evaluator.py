@@ -7,7 +7,7 @@ import hashlib
 import re
 from typing import Any
 
-from switchbox.models import Flag, Rule
+from switchbox.models import Flag, Rule, RuleGroup
 
 # Leading numeric prefix, matching JS parseFloat (e.g. "25px" -> 25, "1e3" -> 1000).
 _NUMERIC_PREFIX = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
@@ -65,11 +65,11 @@ def evaluate(flag: Flag, user_context: dict | None = None) -> bool | str | int |
                 return _enabled_value(flag)
             return flag.default_value
 
-        # 3. Check rules (OR logic — any match wins)
-        if flag.rules:
-            for rule in flag.rules:
-                if _match_rule(rule, user_context):
-                    return _enabled_value(flag)
+        # 3. Check rule groups: OR across groups, AND within a group (two-level
+        #    DNF). Any matching group wins.
+        for group in _to_groups(flag.rules):
+            if _match_group(group, user_context):
+                return _enabled_value(flag)
 
         # 4. Rollout. Resolve the id with a null-only fallback (JS `??`, not
         # `or`): an empty-string user_id is a real id, not falsy.
@@ -92,6 +92,28 @@ def _enabled_value(flag: Flag) -> bool | str | int | Any:
     if flag.flag_type == "boolean":
         return True
     return flag.default_value
+
+
+def _to_groups(rules: list) -> list[RuleGroup]:
+    """Normalise a flag's rules into RuleGroups. ``from_dict`` already yields
+    RuleGroups; this also tolerates a flat list of ``Rule`` (legacy/direct
+    construction) — each becomes its own single-condition group, preserving the
+    old OR semantics. Idempotent."""
+    groups: list[RuleGroup] = []
+    for r in rules:
+        if isinstance(r, RuleGroup):
+            groups.append(r)
+        elif isinstance(r, Rule):
+            groups.append(RuleGroup(conditions=[r]))
+    return groups
+
+
+def _match_group(group: RuleGroup, user_context: dict) -> bool:
+    """A group matches when ALL its conditions match (AND). An empty group
+    matches no one (never 'match all')."""
+    return bool(group.conditions) and all(
+        _match_rule(c, user_context) for c in group.conditions
+    )
 
 
 def _match_rule(rule: Rule, user_context: dict) -> bool:

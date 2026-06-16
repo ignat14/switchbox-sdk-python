@@ -22,8 +22,9 @@ def test_flag_config_from_dict_valid():
     flag = config.flags["feature_a"]
     assert flag.enabled is True
     assert flag.rollout_pct == 50
+    # Legacy flat rule is parsed into a single-condition group (back-compat).
     assert len(flag.rules) == 1
-    assert flag.rules[0].attribute == "country"
+    assert flag.rules[0].conditions[0].attribute == "country"
 
 
 def test_flag_config_from_dict_missing_fields():
@@ -67,6 +68,31 @@ def test_flag_config_from_dict_with_rules():
     }
     config = FlagConfig.from_dict(data)
     assert len(config.flags["f"].rules) == 2
+
+
+def test_flag_config_from_dict_with_dnf_groups():
+    """The two-level shape: a group with multiple AND'd conditions."""
+    data = {
+        "version": "v1",
+        "flags": {
+            "f": {
+                "enabled": True,
+                "rules": [
+                    {
+                        "conditions": [
+                            {"attribute": "country", "operator": "equals", "value": "US"},
+                            {"attribute": "device", "operator": "equals", "value": "mobile"},
+                        ]
+                    },
+                    {"conditions": [{"attribute": "plan", "operator": "equals", "value": "ent"}]},
+                ],
+            }
+        },
+    }
+    flag = FlagConfig.from_dict(data).flags["f"]
+    assert len(flag.rules) == 2  # two groups (OR)
+    assert len(flag.rules[0].conditions) == 2  # AND within the first group
+    assert flag.rules[1].conditions[0].attribute == "plan"
 
 
 def test_flag_defaults():

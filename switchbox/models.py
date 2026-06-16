@@ -6,9 +6,20 @@ from typing import Any
 
 @dataclass
 class Rule:
+    """A single condition. The atom of targeting."""
+
     attribute: str
     operator: str  # equals | not_equals | contains | ends_with | in_list | gt | lt
     value: Any
+
+
+@dataclass
+class RuleGroup:
+    """An AND-group of conditions. Groups are OR'd by the evaluator — two-level
+    DNF (ADR-015): a flag matches if any group matches; a group matches if all
+    its conditions match."""
+
+    conditions: list[Rule] = field(default_factory=list)
 
 
 @dataclass
@@ -18,7 +29,20 @@ class Flag:
     rollout_pct: int
     flag_type: str  # boolean | string | number | json
     default_value: Any
-    rules: list[Rule] = field(default_factory=list)
+    rules: list[RuleGroup] = field(default_factory=list)
+
+
+def _parse_condition(d: dict) -> Rule:
+    return Rule(attribute=d["attribute"], operator=d["operator"], value=d["value"])
+
+
+def _parse_rule_group(entry: dict) -> RuleGroup:
+    """Parse one rules entry, accepting the two-level shape
+    ``{"conditions": [...]}`` and the legacy flat ``{attribute, operator, value}``
+    (a pre-DNF config) — the latter becomes a single-condition group."""
+    if "conditions" in entry:
+        return RuleGroup(conditions=[_parse_condition(c) for c in entry["conditions"]])
+    return RuleGroup(conditions=[_parse_condition(entry)])
 
 
 @dataclass
@@ -31,14 +55,7 @@ class FlagConfig:
         """Parse the CDN JSON into a FlagConfig object."""
         flags = {}
         for key, flag_data in data.get("flags", {}).items():
-            rules = [
-                Rule(
-                    attribute=r["attribute"],
-                    operator=r["operator"],
-                    value=r["value"],
-                )
-                for r in flag_data.get("rules", [])
-            ]
+            rules = [_parse_rule_group(r) for r in flag_data.get("rules", [])]
             flags[key] = Flag(
                 key=key,
                 enabled=flag_data["enabled"],
