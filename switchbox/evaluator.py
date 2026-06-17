@@ -88,10 +88,16 @@ def evaluate(flag: Flag, user_context: dict | None = None) -> bool | str | int |
 
 
 def _enabled_value(flag: Flag) -> bool | str | int | Any:
-    """Return the appropriate 'enabled' value based on flag type."""
+    """The value served to matched / in-rollout users.
+
+    Boolean flags serve ``True``. Non-boolean flags serve ``enabled_value``
+    (variations, ADR-017), falling back to ``default_value`` when it's unset —
+    so a config without ``enabled_value`` behaves exactly as before. Fallback is
+    at evaluation time (not parse time) so directly-constructed Flags work too,
+    matching the JS SDK's ``?? default_value``."""
     if flag.flag_type == "boolean":
         return True
-    return flag.default_value
+    return flag.enabled_value if flag.enabled_value is not None else flag.default_value
 
 
 def _to_groups(rules: list) -> list[RuleGroup]:
