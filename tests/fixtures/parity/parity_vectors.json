@@ -1,5 +1,5 @@
 {
-  "_comment": "SEC-4 cross-SDK parity vectors. This file MUST be byte-identical to switchbox-sdk-js/packages/core/tests/parity_vectors.json — it is duplicated into each repo because each SDK is built/tested by its own CI. Canonical semantics are JS-style: lowercase booleans (String(true)='true'), parseFloat-style prefix numeric parsing, null coerces to 'null', user_id resolved with ??-style null-only fallback, and a user context lacking a usable id serves only 100% rollouts (ADR-008). See DECISIONS.md ADR-013. When you change one copy, change the other and run both suites.",
+  "_comment": "SEC-4 cross-SDK parity vectors (evaluation half of the parity story; the format half is fixtures/cdn-json/). CANONICAL SOURCE: fixtures/parity/parity_vectors.json — distributed into each SDK repo's tests/fixtures/parity/ by `python3 fixtures/sync.py` (do NOT hand-edit a synced copy; edit the canonical and re-sync). Both SDK suites run it (test_parity_vectors.py, parity.test.ts). Sections: rule_match (single-condition coercion/operators), evaluate (full evaluate path incl. rollout-bucket boundaries), rollout_bucket (sha256(user_id:flag_key)%100 — pins the hash itself across languages). Canonical semantics are JS-style: lowercase booleans (String(true)='true'), parseFloat-style prefix numeric parsing, null coerces to 'null', user_id resolved with ??-style null-only fallback, and a user context lacking a usable id serves only 100% rollouts (ADR-008). See DECISIONS.md ADR-013 (coercion) + ADR-024 (shared-fixture mechanism).",
   "rule_match": [
     {"name": "boolean true matches lowercase 'true'", "rule": {"attribute": "is_beta", "operator": "equals", "value": "true"}, "context": {"is_beta": true}, "expected": true},
     {"name": "boolean false matches lowercase 'false'", "rule": {"attribute": "is_beta", "operator": "equals", "value": "false"}, "context": {"is_beta": false}, "expected": true},
@@ -40,6 +40,17 @@
     {"name": "variation: absent enabled_value falls back to default on match", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 0, "flag_type": "string", "default_value": "Shop", "rules": [{"conditions": [{"attribute": "plan", "operator": "equals", "value": "pro"}]}]}, "user": {"plan": "pro", "user_id": "u1"}, "expected": "Shop"},
     {"name": "variation: number flag rollout 100 no context serves enabled_value", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "number", "default_value": 0, "enabled_value": 42, "rules": []}, "user": null, "expected": 42},
     {"name": "variation: disabled non-boolean serves default_value", "flag_key": "f", "flag": {"enabled": false, "rollout_pct": 100, "flag_type": "string", "default_value": "Shop", "enabled_value": "Buy now", "rules": []}, "user": {"user_id": "u1"}, "expected": "Shop"},
-    {"name": "variation: boolean flag ignores enabled_value (serves true)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "boolean", "default_value": false, "enabled_value": "ignored", "rules": []}, "user": null, "expected": true}
+    {"name": "variation: boolean flag ignores enabled_value (serves true)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "boolean", "default_value": false, "enabled_value": "ignored", "rules": []}, "user": null, "expected": true},
+    {"name": "rollout: user bucket 58 with rollout 59 -> enabled (bucket < pct)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 59, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "u_low"}, "expected": true},
+    {"name": "rollout: user bucket 58 with rollout 58 -> default (boundary is exclusive)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 58, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "u_low"}, "expected": false},
+    {"name": "rollout: user bucket 47 with rollout 48 -> enabled", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 48, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "user-2"}, "expected": true},
+    {"name": "rollout: user bucket 47 with rollout 47 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 47, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "user-2"}, "expected": false}
+  ],
+  "rollout_bucket": [
+    {"name": "42:new_checkout", "user_id": "42", "flag_key": "new_checkout", "expected": 98},
+    {"name": "user_100:feature_x", "user_id": "user_100", "flag_key": "feature_x", "expected": 4},
+    {"name": "abc:search_version", "user_id": "abc", "flag_key": "search_version", "expected": 10},
+    {"name": "u_low:f", "user_id": "u_low", "flag_key": "f", "expected": 58},
+    {"name": "user-2:f", "user_id": "user-2", "flag_key": "f", "expected": 47}
   ]
 }
