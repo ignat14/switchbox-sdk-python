@@ -1,0 +1,133 @@
+{
+  "flags": {
+    "all_operators": {
+      "default_value": false,
+      "enabled": true,
+      "flag_type": "boolean",
+      "rollout_pct": 0,
+      "rules": [
+        {
+          "conditions": [
+            {
+              "attribute": "email",
+              "operator": "ends_with",
+              "value": "@acme.com"
+            },
+            {
+              "attribute": "plan",
+              "operator": "equals",
+              "value": "pro"
+            }
+          ]
+        },
+        {
+          "conditions": [
+            {
+              "attribute": "age",
+              "operator": "gt",
+              "value": 18
+            },
+            {
+              "attribute": "age",
+              "operator": "lt",
+              "value": 65
+            }
+          ]
+        },
+        {
+          "conditions": [
+            {
+              "attribute": "country",
+              "operator": "in_list",
+              "value": [
+                "US",
+                "CA",
+                "GB"
+              ]
+            },
+            {
+              "attribute": "name",
+              "operator": "contains",
+              "value": "a"
+            },
+            {
+              "attribute": "role",
+              "operator": "not_equals",
+              "value": "guest"
+            }
+          ]
+        }
+      ]
+    },
+    "bool_off": {
+      "default_value": false,
+      "enabled": false,
+      "flag_type": "boolean",
+      "rollout_pct": 100,
+      "rules": []
+    },
+    "bool_on": {
+      "default_value": false,
+      "enabled": true,
+      "flag_type": "boolean",
+      "rollout_pct": 100,
+      "rules": []
+    },
+    "json_variant": {
+      "default_value": {
+        "theme": "light"
+      },
+      "enabled": true,
+      "enabled_value": {
+        "theme": "dark"
+      },
+      "flag_type": "json",
+      "rollout_pct": 100,
+      "rules": []
+    },
+    "number_rollout": {
+      "default_value": 0,
+      "enabled": true,
+      "enabled_value": 42,
+      "flag_type": "number",
+      "rollout_pct": 25,
+      "rules": []
+    },
+    "segment_flag": {
+      "default_value": false,
+      "enabled": true,
+      "flag_type": "boolean",
+      "rollout_pct": 100,
+      "rules": [
+        {
+          "conditions": [
+            {
+              "attribute": "plan",
+              "operator": "equals",
+              "value": "enterprise"
+            }
+          ]
+        }
+      ]
+    },
+    "string_ab": {
+      "default_value": "control",
+      "enabled": true,
+      "enabled_value": "treatment",
+      "flag_type": "string",
+      "rollout_pct": 100,
+      "rules": [
+        {
+          "conditions": [
+            {
+              "attribute": "country",
+              "operator": "equals",
+              "value": "US"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "version": "2026-01-01T00:00:00+00:00"
+}
