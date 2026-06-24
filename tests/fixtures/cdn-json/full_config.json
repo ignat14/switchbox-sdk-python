@@ -97,7 +97,7 @@
       "default_value": false,
       "enabled": true,
       "flag_type": "boolean",
-      "rollout_pct": 100,
+      "rollout_pct": 0,
       "rules": [
         {
           "conditions": [
@@ -115,7 +115,7 @@
       "enabled": true,
       "enabled_value": "treatment",
       "flag_type": "string",
-      "rollout_pct": 100,
+      "rollout_pct": 0,
       "rules": [
         {
           "conditions": [
