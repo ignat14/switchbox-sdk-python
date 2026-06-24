@@ -129,6 +129,7 @@ client = Switchbox(
     sdk_key="your-sdk-key-from-dashboard",  # required — get from Environments tab
     poll_interval=60,                       # seconds between polls (default: 30)
     on_error=lambda e: logger.warning(e),   # called on fetch errors (default: None)
+    block_on_init=True,                     # block on the first fetch (default: True)
 )
 ```
 
@@ -137,8 +138,31 @@ client = Switchbox(
 | `sdk_key`       | `str`                          | —       | SDK key from the environment in the dashboard  |
 | `poll_interval` | `int`                          | `30`    | Seconds between background config refreshes    |
 | `on_error`      | `Callable[[Exception], None]`  | `None`  | Callback invoked when a fetch or parse fails   |
+| `timeout`       | `int`                          | `10`    | Per-fetch HTTP timeout in seconds              |
+| `block_on_init` | `bool`                         | `True`  | Fetch the first config synchronously (see below) |
 
 The SDK builds the CDN URL automatically from the SDK key. You can override with `cdn_base_url` if self-hosting.
+
+### Blocking vs. non-blocking startup
+
+By default (`block_on_init=True`) the constructor performs the **first fetch synchronously**, so
+`client.ready` is `True` the moment `Switchbox(...)` returns — your first flag check already sees live
+config. The trade-off: construction blocks up to `timeout` seconds if the CDN is slow or unreachable,
+which can stall an app's startup path.
+
+Set `block_on_init=False` to return immediately and fetch in the background instead. The client starts
+**not ready** (flag checks fall back to your supplied defaults) and becomes ready as soon as the first
+background fetch lands. Poll `client.ready` if you need to know when live config is available:
+
+```python
+client = Switchbox(sdk_key="...", block_on_init=False)
+# returns instantly, even if the CDN is down — checks use defaults until ready
+if client.enabled("new_checkout", user={"user_id": "42"}):
+    ...
+```
+
+(The JavaScript SDK makes the same choice explicit at the API surface: `await Switchbox.create(...)`
+blocks on the first fetch, while `new Switchbox(...)` without awaiting `init()` does not.)
 
 ## How It Works
 
@@ -172,9 +196,12 @@ The API server is only in the write path. All read traffic goes to the CDN.
 
 ## API Reference
 
-### `Switchbox(sdk_key, poll_interval=30, on_error=None)`
+### `Switchbox(sdk_key, poll_interval=30, on_error=None, timeout=10, block_on_init=True)`
 
-Creates a new client. Performs an initial synchronous fetch on creation, then starts background polling.
+Creates a new client and starts background polling. With `block_on_init=True` (default) it performs an
+initial **synchronous** fetch on creation (the client is `ready` on return); with `block_on_init=False`
+the first fetch happens in the background and the constructor returns immediately. See
+[Blocking vs. non-blocking startup](#blocking-vs-non-blocking-startup).
 
 ### `client.enabled(flag_key, user=None) -> bool`
 

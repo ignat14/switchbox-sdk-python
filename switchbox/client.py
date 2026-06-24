@@ -35,12 +35,17 @@ class Switchbox:
         on_error: Callable[[Exception], None] | None = None,
         timeout: int = 10,
         cdn_base_url: str | None = None,
+        block_on_init: bool = True,
     ) -> None:
         base = cdn_base_url or CDN_BASE_URL
         cdn_url = f"{base}/{sdk_key}/flags.json"
         self._cache = FlagCache()
         self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error, timeout=timeout)
-        self._sync.start()
+        # block_on_init=True (default): the constructor performs the first fetch
+        # synchronously, so the client is `ready` on return. Set False to fetch in
+        # the background instead — the constructor returns immediately and never
+        # blocks on a slow/unreachable CDN (SEC-9). See `ready`.
+        self._sync.start(block=block_on_init)
 
     @property
     def ready(self) -> bool:
