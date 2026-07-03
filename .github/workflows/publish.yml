@@ -19,6 +19,18 @@ jobs:
         with:
           python-version: "3.14"
 
+      # Run the suite in the tag path (FABLE_IMPROVEMENTS 3.2): test.yml doesn't
+      # trigger on tags, so without this a broken evaluator could ship to PyPI
+      # untested (the JS publish already tests first — this restores symmetry).
+      - name: Install package (with dev deps)
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q
+
       - name: Install build tools
         run: pip install build
 
