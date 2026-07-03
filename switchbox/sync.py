@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 from typing import Callable
 
+from switchbox._version import __version__
 from switchbox.cache import FlagCache
 from switchbox.exceptions import ConfigFetchError
 from switchbox.models import FlagConfig
@@ -86,7 +87,7 @@ class SyncWorker:
         try:
             req = urllib.request.Request(
                 self._cdn_url,
-                headers={"User-Agent": "switchbox-python/0.6.0"},
+                headers={"User-Agent": f"switchbox-python/{__version__}"},
             )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))

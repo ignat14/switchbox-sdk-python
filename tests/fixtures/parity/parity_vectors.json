@@ -1,5 +1,5 @@
 {
-  "_comment": "SEC-4 cross-SDK parity vectors (evaluation half of the parity story; the format half is fixtures/cdn-json/). CANONICAL SOURCE: fixtures/parity/parity_vectors.json — distributed into each SDK repo's tests/fixtures/parity/ by `python3 fixtures/sync.py` (do NOT hand-edit a synced copy; edit the canonical and re-sync). Both SDK suites run it (test_parity_vectors.py, parity.test.ts). Sections: rule_match (single-condition coercion/operators), evaluate (full evaluate path incl. rollout-bucket boundaries), rollout_bucket (sha256(user_id:flag_key)%100 — pins the hash itself across languages). Canonical semantics are JS-style: lowercase booleans (String(true)='true'), parseFloat-style prefix numeric parsing, null coerces to 'null', user_id resolved with ??-style null-only fallback, and a user context lacking a usable id serves only 100% rollouts (ADR-008). See DECISIONS.md ADR-013 (coercion) + ADR-024 (shared-fixture mechanism).",
+  "_comment": "SEC-4 cross-SDK parity vectors (evaluation half of the parity story; the format half is fixtures/cdn-json/). CANONICAL SOURCE: fixtures/parity/parity_vectors.json — distributed into each SDK repo's tests/fixtures/parity/ by `python3 fixtures/sync.py` (do NOT hand-edit a synced copy; edit the canonical and re-sync). Both SDK suites run it (test_parity_vectors.py, parity.test.ts). Sections: rule_match (single-condition coercion/operators), evaluate (full evaluate path incl. rollout-bucket boundaries), rollout_bucket (sha256(user_id:flag_key)%100 — pins the hash itself across languages). Canonical semantics are JS-style: lowercase booleans (String(true)='true'), parseFloat-style prefix numeric parsing, null coerces to 'null', user_id resolved with ??-style null-only fallback, and a user context lacking a usable id serves only 100% rollouts (ADR-008). The 'hostile:' vectors (FABLE_IMPROVEMENTS 2.8) pin the outside-the-happy-path envelope: evaluation-never-throws containment (ADR-043), {} context = no matching attributes, omitted flag_type/rollout_pct parse defaults (boolean/0), prototype-chain attributes, string-valued in_list substring semantics, Infinity/1e21 coercion, non-ASCII rollout hashing. Runners must exercise their REAL parse path (Python FlagConfig.from_dict, JS normalizeConfig) and compare strictly (no True==1). See DECISIONS.md ADR-013 (coercion) + ADR-024 (shared-fixture mechanism) + ADR-043 (error containment).",
   "rule_match": [
     {"name": "boolean true matches lowercase 'true'", "rule": {"attribute": "is_beta", "operator": "equals", "value": "true"}, "context": {"is_beta": true}, "expected": true},
     {"name": "boolean false matches lowercase 'false'", "rule": {"attribute": "is_beta", "operator": "equals", "value": "false"}, "context": {"is_beta": false}, "expected": true},
@@ -17,7 +17,19 @@
     {"name": "lt numeric", "rule": {"attribute": "age", "operator": "lt", "value": "18"}, "context": {"age": "5"}, "expected": true},
     {"name": "in_list string member matches", "rule": {"attribute": "country", "operator": "in_list", "value": ["US", "CA", "UK"]}, "context": {"country": "US"}, "expected": true},
     {"name": "in_list stringified number does not match raw number item (shared footgun)", "rule": {"attribute": "n", "operator": "in_list", "value": [42]}, "context": {"n": 42}, "expected": false},
-    {"name": "in_list stringified number matches string item", "rule": {"attribute": "n", "operator": "in_list", "value": ["42"]}, "context": {"n": 42}, "expected": true}
+    {"name": "in_list stringified number matches string item", "rule": {"attribute": "n", "operator": "in_list", "value": ["42"]}, "context": {"n": 42}, "expected": true},
+    {"name": "hostile: in_list with a STRING rule value does substring matching (pinned coincidence: JS String.includes / Python 'in')", "rule": {"attribute": "country", "operator": "in_list", "value": "US,CA"}, "context": {"country": "US"}, "expected": true},
+    {"name": "hostile: in_list string rule value, non-substring does not match", "rule": {"attribute": "country", "operator": "in_list", "value": "US,CA"}, "context": {"country": "FR"}, "expected": false},
+    {"name": "hostile: not_equals with an absent attribute does not match (absence is not inequality)", "rule": {"attribute": "plan", "operator": "not_equals", "value": "pro"}, "context": {"other": 1}, "expected": false},
+    {"name": "hostile: prototype-chain attribute never matches (constructor)", "rule": {"attribute": "constructor", "operator": "equals", "value": "anything"}, "context": {"other": "x"}, "expected": false},
+    {"name": "hostile: prototype-chain attribute never matches (toString)", "rule": {"attribute": "toString", "operator": "not_equals", "value": "x"}, "context": {"other": "x"}, "expected": false},
+    {"name": "hostile: gt parses a string 'Infinity' context like parseFloat", "rule": {"attribute": "n", "operator": "gt", "value": "1000000"}, "context": {"n": "Infinity"}, "expected": true},
+    {"name": "hostile: lt parses '-Infinity'", "rule": {"attribute": "n", "operator": "lt", "value": "0"}, "context": {"n": "-Infinity"}, "expected": true},
+    {"name": "hostile: gt with 'Infinity' RULE value never matches a finite context", "rule": {"attribute": "n", "operator": "gt", "value": "Infinity"}, "context": {"n": "999999999"}, "expected": false},
+    {"name": "hostile: equals at 1e21 uses exponential form (String(1e21)='1e+21')", "rule": {"attribute": "n", "operator": "equals", "value": "1e+21"}, "context": {"n": 1e21}, "expected": true},
+    {"name": "hostile: gt with tiny float context (1e-5 > 0, numeric path)", "rule": {"attribute": "n", "operator": "gt", "value": "0"}, "context": {"n": 1e-5}, "expected": true},
+    {"name": "hostile: gt with huge float context (1e21 > 1e20)", "rule": {"attribute": "n", "operator": "gt", "value": "1e20"}, "context": {"n": 1e21}, "expected": true},
+    {"name": "hostile: equals with CJK strings", "rule": {"attribute": "name", "operator": "equals", "value": "用户"}, "context": {"name": "用户"}, "expected": true}
   ],
   "evaluate": [
     {"name": "disabled flag returns default", "flag_key": "f", "flag": {"enabled": false, "rollout_pct": 100, "flag_type": "boolean", "default_value": "off", "rules": []}, "user": {"user_id": "1"}, "expected": "off"},
@@ -44,13 +56,23 @@
     {"name": "rollout: user bucket 58 with rollout 59 -> enabled (bucket < pct)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 59, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "u_low"}, "expected": true},
     {"name": "rollout: user bucket 58 with rollout 58 -> default (boundary is exclusive)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 58, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "u_low"}, "expected": false},
     {"name": "rollout: user bucket 47 with rollout 48 -> enabled", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 48, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "user-2"}, "expected": true},
-    {"name": "rollout: user bucket 47 with rollout 47 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 47, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "user-2"}, "expected": false}
+    {"name": "rollout: user bucket 47 with rollout 47 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 47, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "user-2"}, "expected": false},
+    {"name": "hostile: malformed in_list (null value) is contained -> default (evaluation never throws, ADR-043)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 0, "flag_type": "boolean", "default_value": false, "rules": [{"conditions": [{"attribute": "x", "operator": "in_list", "value": null}]}]}, "user": {"x": "a", "user_id": "u1"}, "expected": false},
+    {"name": "hostile: empty user context {} behaves like no matching attributes, rollout 100 -> enabled", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {}, "expected": true},
+    {"name": "hostile: empty user context {}, rollout 50 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 50, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {}, "expected": false},
+    {"name": "hostile: empty user context {} with rules present, rollout 0 -> default", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 0, "flag_type": "boolean", "default_value": false, "rules": [{"conditions": [{"attribute": "plan", "operator": "equals", "value": "pro"}]}]}, "user": {}, "expected": false},
+    {"name": "hostile: omitted flag_type defaults to boolean (serves true)", "flag_key": "f", "flag": {"enabled": true, "rollout_pct": 100, "default_value": false, "rules": []}, "user": null, "expected": true},
+    {"name": "hostile: omitted rollout_pct defaults to 0 -> default", "flag_key": "f", "flag": {"enabled": true, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "u1"}, "expected": false},
+    {"name": "hostile: non-ASCII user_id evaluates through the rollout hash (bucket 18 < 50)", "flag_key": "new_checkout", "flag": {"enabled": true, "rollout_pct": 50, "flag_type": "boolean", "default_value": false, "rules": []}, "user": {"user_id": "用户42"}, "expected": true}
   ],
   "rollout_bucket": [
     {"name": "42:new_checkout", "user_id": "42", "flag_key": "new_checkout", "expected": 98},
     {"name": "user_100:feature_x", "user_id": "user_100", "flag_key": "feature_x", "expected": 4},
     {"name": "abc:search_version", "user_id": "abc", "flag_key": "search_version", "expected": 10},
     {"name": "u_low:f", "user_id": "u_low", "flag_key": "f", "expected": 58},
-    {"name": "user-2:f", "user_id": "user-2", "flag_key": "f", "expected": 47}
+    {"name": "user-2:f", "user_id": "user-2", "flag_key": "f", "expected": 47},
+    {"name": "hostile: CJK user_id (UTF-8 hashing parity)", "user_id": "用户42", "flag_key": "new_checkout", "expected": 18},
+    {"name": "hostile: emoji user_id (astral-plane UTF-8)", "user_id": "🚀user", "flag_key": "feature_x", "expected": 59},
+    {"name": "hostile: latin diacritics user_id", "user_id": "Ünïcode-Üser", "flag_key": "search_version", "expected": 85}
   ]
 }

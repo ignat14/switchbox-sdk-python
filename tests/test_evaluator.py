@@ -243,3 +243,56 @@ def test_rule_attribute_not_in_context_skipped():
         rules=[Rule(attribute="missing_attr", operator="equals", value="x")],
     )
     assert evaluate(flag, {"user_id": "1", "other": "y"}) is False
+
+
+# --- JS-coercion extremes (FABLE_IMPROVEMENTS 2.9) ---
+
+
+def test_js_str_extremes_match_js_string():
+    """The cheap-to-fix String() divergences, pinned: Infinity/NaN naming,
+    exponential form at 1e21+, no zero-padded exponents. The residual
+    divergence (fixed-vs-exponential in the 1e-6..1e-4 range, lists/dicts) is
+    documented in _js_str's docstring, deliberately not chased."""
+    from switchbox.evaluator import _js_str
+
+    assert _js_str(float("inf")) == "Infinity"
+    assert _js_str(float("-inf")) == "-Infinity"
+    assert _js_str(float("nan")) == "NaN"
+    assert _js_str(1e21) == "1e+21"  # JS switches to exponential at 1e21
+    assert _js_str(1e22) == "1e+22"
+    assert _js_str(1e20) == "100000000000000000000"  # still fixed below 1e21
+    assert _js_str(1e-7) == "1e-7"  # no zero-padded exponent ("1e-07")
+    assert _js_str(1.5e-8) == "1.5e-8"
+    assert _js_str(42.0) == "42"  # unchanged: int-valued float drops .0
+
+
+def test_to_number_parses_infinity_like_parsefloat():
+    from switchbox.evaluator import _to_number
+
+    assert _to_number("Infinity") == float("inf")
+    assert _to_number("+Infinity") == float("inf")
+    assert _to_number("-Infinity") == float("-inf")
+    assert _to_number("Infinity-and-beyond") == float("inf")  # prefix parse
+    assert _to_number("Inf") is None  # parseFloat("Inf") is NaN
+
+
+def test_empty_context_takes_the_rules_path_not_the_no_context_branch():
+    """{} is a real (empty) context: rules are walked (none can match), then
+    the no-usable-id tail applies — the same path JS takes (parity-pinned by
+    the hostile vectors)."""
+    flag = make_flag(rollout_pct=100)
+    assert evaluate(flag, {}) is True
+    flag = make_flag(rollout_pct=50)
+    assert evaluate(flag, {}) is False
+
+
+def test_evaluation_error_is_contained_to_default():
+    """Evaluation never throws (ADR-043): a malformed in_list value degrades to
+    default_value. Same contract as the JS SDK's try/catch."""
+    flag = make_flag(
+        rollout_pct=0,
+        default_value="safe",
+        flag_type="string",
+        rules=[Rule(attribute="x", operator="in_list", value=None)],
+    )
+    assert evaluate(flag, {"x": "a", "user_id": "u1"}) == "safe"

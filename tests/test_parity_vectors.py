@@ -39,9 +39,19 @@ def test_rule_match_vectors(case):
     assert _match_rule(rule, case["context"]) == case["expected"]
 
 
+def _assert_strict(result, expected):
+    """Value AND type must match — Python's `==` alone would let `True == 1`
+    pass while the JS runner's `toBe` fails it (runner-asymmetry fix,
+    FABLE_IMPROVEMENTS 2.8)."""
+    assert result == expected and type(result) is type(expected), (
+        f"{result!r} ({type(result).__name__}) != "
+        f"{expected!r} ({type(expected).__name__})"
+    )
+
+
 @pytest.mark.parametrize("case", _VECTORS["evaluate"], ids=lambda c: c["name"])
 def test_evaluate_vectors(case):
-    assert evaluate(_flag_from(case), case["user"]) == case["expected"]
+    _assert_strict(evaluate(_flag_from(case), case["user"]), case["expected"])
 
 
 @pytest.mark.parametrize("case", _VECTORS["rollout_bucket"], ids=lambda c: c["name"])

@@ -56,17 +56,28 @@ class FlagConfig:
 
     @classmethod
     def from_dict(cls, data: dict) -> FlagConfig:
-        """Parse the CDN JSON into a FlagConfig object."""
+        """Parse the CDN JSON into a FlagConfig object.
+
+        **Per-flag tolerant** (FABLE_IMPROVEMENTS 2.3): one malformed flag —
+        e.g. a missing ``enabled`` or a null ``rules`` from a future publisher
+        bug — is skipped, not fatal. Before this, the sync loop's generic
+        handler discarded the *entire* config, freezing every Python client on
+        the old version while the (per-flag tolerant) JS SDK kept updating.
+        The JS parser skips non-object flag entries the same way
+        (``normalizeConfig`` in ``sync.ts``); keep them aligned."""
         flags = {}
         for key, flag_data in data.get("flags", {}).items():
-            rules = [_parse_rule_group(r) for r in flag_data.get("rules", [])]
-            flags[key] = Flag(
-                key=key,
-                enabled=flag_data["enabled"],
-                rollout_pct=flag_data.get("rollout_pct", 0),
-                flag_type=flag_data.get("flag_type", "boolean"),
-                default_value=flag_data.get("default_value"),
-                enabled_value=flag_data.get("enabled_value"),
-                rules=rules,
-            )
+            try:
+                rules = [_parse_rule_group(r) for r in flag_data.get("rules") or []]
+                flags[key] = Flag(
+                    key=key,
+                    enabled=flag_data["enabled"],
+                    rollout_pct=flag_data.get("rollout_pct", 0),
+                    flag_type=flag_data.get("flag_type", "boolean"),
+                    default_value=flag_data.get("default_value"),
+                    enabled_value=flag_data.get("enabled_value"),
+                    rules=rules,
+                )
+            except Exception:
+                continue  # skip the bad flag, keep the rest
         return cls(version=data.get("version", ""), flags=flags)

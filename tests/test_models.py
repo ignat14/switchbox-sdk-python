@@ -10,9 +10,7 @@ def test_flag_config_from_dict_valid():
                 "rollout_pct": 50,
                 "flag_type": "boolean",
                 "default_value": False,
-                "rules": [
-                    {"attribute": "country", "operator": "equals", "value": "US"}
-                ],
+                "rules": [{"attribute": "country", "operator": "equals", "value": "US"}],
             }
         },
     }
@@ -105,3 +103,56 @@ def test_rule_stores_fields():
     assert rule.attribute == "country"
     assert rule.operator == "equals"
     assert rule.value == "US"
+
+
+def test_from_dict_skips_a_malformed_flag_keeps_the_rest():
+    """Per-flag tolerance (FABLE_IMPROVEMENTS 2.3): one bad flag from a future
+    publisher bug must not discard the whole config — that froze every Python
+    client on the old version while the JS SDK kept updating."""
+    data = {
+        "version": "v1",
+        "flags": {
+            "good": {
+                "enabled": True,
+                "rollout_pct": 100,
+                "flag_type": "boolean",
+                "default_value": False,
+                "rules": [],
+            },
+            "missing_enabled": {
+                "rollout_pct": 100,
+                "flag_type": "boolean",
+                "default_value": False,
+                "rules": [],
+            },
+            "not_a_dict": None,
+            "garbage_rules": {
+                "enabled": True,
+                "rollout_pct": 0,
+                "flag_type": "boolean",
+                "default_value": False,
+                "rules": [{"conditions": [{"nope": 1}]}],
+            },
+        },
+    }
+    config = FlagConfig.from_dict(data)
+    assert set(config.flags) == {"good"}
+    assert config.version == "v1"
+
+
+def test_from_dict_null_rules_parses_as_no_rules():
+    """A null `rules` is tolerated as [] (JS toRuleGroups(null) → []), not fatal."""
+    data = {
+        "version": "v1",
+        "flags": {
+            "f": {
+                "enabled": True,
+                "rollout_pct": 100,
+                "flag_type": "boolean",
+                "default_value": False,
+                "rules": None,
+            }
+        },
+    }
+    flag = FlagConfig.from_dict(data).flags["f"]
+    assert flag.rules == []

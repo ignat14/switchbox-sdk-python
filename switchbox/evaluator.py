@@ -20,25 +20,48 @@ def _js_str(value: Any) -> str:
     - booleans are lowercase ("true"/"false"), not Python's "True"/"False"
     - None becomes "null"
     - an integer-valued float drops its trailing ".0" (JS has no int/float split)
+      — but only below 1e21, where JS switches to exponential notation
+    - NaN/Infinity render as JS does ("NaN"/"Infinity"), not Python's "nan"/"inf"
+    - exponents are not zero-padded ("1e-7", not Python's "1e-07")
+
+    Residual, documented divergence (deliberately not chased — see
+    FABLE_IMPROVEMENTS 2.9): floats in [1e-6, 1e-4) render exponential here but
+    fixed in JS (str(1e-5)="1e-05" vs String(1e-5)="0.00001"), and lists/dicts
+    stringify Python-style, not JS-style ("[object Object]"). Vectors only pin
+    the converged cases.
     """
     if isinstance(value, bool):
         return "true" if value else "false"
     if value is None:
         return "null"
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return "NaN"
+        if value == float("inf"):
+            return "Infinity"
+        if value == float("-inf"):
+            return "-Infinity"
+        if value.is_integer() and abs(value) < 1e21:
+            return str(int(value))
+        return re.sub(r"e([+-])0(\d)$", r"e\1\2", str(value))
     return str(value)
 
 
 def _to_number(value: Any) -> float | None:
     """Mimic JS parseFloat(String(value)): parse a leading numeric prefix, or
     return None (JS NaN) when there isn't one. Booleans are NaN, matching
-    parseFloat("true")."""
+    parseFloat("true"). "Infinity"/"-Infinity" prefixes parse like parseFloat
+    does (parseFloat("Infinity") is Infinity, not NaN)."""
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    match = _NUMERIC_PREFIX.match(str(value).lstrip())
+    s = str(value).lstrip()
+    if s.startswith(("Infinity", "+Infinity")):
+        return float("inf")
+    if s.startswith("-Infinity"):
+        return float("-inf")
+    match = _NUMERIC_PREFIX.match(s)
     return float(match.group(0)) if match else None
 
 
@@ -59,8 +82,11 @@ def evaluate(flag: Flag, user_context: dict | None = None) -> bool | str | int |
         if not flag.enabled:
             return flag.default_value
 
-        # 2. No user context
-        if not user_context:
+        # 2. No user context (None only — an empty dict {} deliberately proceeds
+        #    to the rules loop and behaves like "no matching attributes", the
+        #    same path the JS SDK takes; parity-pinned. The end result is
+        #    identical because step 5 mirrors this branch.)
+        if user_context is None:
             if flag.rollout_pct == 100:
                 return _enabled_value(flag)
             return flag.default_value
