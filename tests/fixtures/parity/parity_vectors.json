@@ -29,7 +29,8 @@
     {"name": "hostile: equals at 1e21 uses exponential form (String(1e21)='1e+21')", "rule": {"attribute": "n", "operator": "equals", "value": "1e+21"}, "context": {"n": 1e21}, "expected": true},
     {"name": "hostile: gt with tiny float context (1e-5 > 0, numeric path)", "rule": {"attribute": "n", "operator": "gt", "value": "0"}, "context": {"n": 1e-5}, "expected": true},
     {"name": "hostile: gt with huge float context (1e21 > 1e20)", "rule": {"attribute": "n", "operator": "gt", "value": "1e20"}, "context": {"n": 1e21}, "expected": true},
-    {"name": "hostile: equals with CJK strings", "rule": {"attribute": "name", "operator": "equals", "value": "用户"}, "context": {"name": "用户"}, "expected": true}
+    {"name": "hostile: equals with CJK strings", "rule": {"attribute": "name", "operator": "equals", "value": "用户"}, "context": {"name": "用户"}, "expected": true},
+    {"name": "hostile: an UNKNOWN operator never matches (forward-compat: an old SDK reading a future operator fails safe, SEC-14)", "rule": {"attribute": "x", "operator": "regex_match", "value": ".*"}, "context": {"x": "anything"}, "expected": false}
   ],
   "evaluate": [
     {"name": "disabled flag returns default", "flag_key": "f", "flag": {"enabled": false, "rollout_pct": 100, "flag_type": "boolean", "default_value": "off", "rules": []}, "user": {"user_id": "1"}, "expected": "off"},
