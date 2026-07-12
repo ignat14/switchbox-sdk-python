@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "switchbox-openfeature"
+version = "0.1.0"
+description = "OpenFeature provider for Switchbox feature flags"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Switchbox" }]
+keywords = ["feature-flags", "feature-toggles", "openfeature", "openfeature-provider"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+dependencies = [
+    "switchbox-flags>=0.7.0,<1.0",
+    # Pre-1.0 host SDK: the provider interface can still break between minors.
+    # Widen this range deliberately per release, never open-ended (OPENFEATURE.md).
+    "openfeature-sdk>=0.10,<0.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/ignat14/switchbox-sdk-python"
+Repository = "https://github.com/ignat14/switchbox-sdk-python"
+Issues = "https://github.com/ignat14/switchbox-sdk-python/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["switchbox_openfeature"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]

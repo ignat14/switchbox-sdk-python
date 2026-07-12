@@ -230,6 +230,10 @@ Get all flag values resolved for a user. Returns an empty dict if no config is a
 
 Stop background polling. Call this on application shutdown.
 
+## OpenFeature
+
+Prefer coding against the vendor-neutral [OpenFeature](https://openfeature.dev) API? Install the official provider, [`switchbox-openfeature`](https://pypi.org/project/switchbox-openfeature/) (in this repo under [`providers/openfeature`](./providers/openfeature)). It wraps this SDK with zero evaluation logic, so evaluation stays local and results are identical.
+
 ## Contributing
 
 ```sh

@@ -50,8 +50,17 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      # The core editable install above satisfies the provider's
+      # switchbox-flags requirement, so this tests provider + local core
+      # together (the publish workflow tests against the *published* core).
+      - name: Install OpenFeature provider
+        run: pip install -e providers/openfeature
+
       - name: Lint
         run: ruff check .
 
       - name: Test with coverage
         run: pytest -v --cov=switchbox --cov-report=term-missing --cov-fail-under=80
+
+      - name: Test OpenFeature provider
+        run: pytest providers/openfeature/tests -q

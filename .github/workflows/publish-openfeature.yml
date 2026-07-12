@@ -1,0 +1,45 @@
+name: Publish switchbox-openfeature to PyPI
+
+# The provider is separately versioned from the core SDK: its own tag prefix
+# (openfeature-v1.2.3), its own PyPI project, same trusted-publishing flow.
+on:
+  push:
+    tags:
+      - "openfeature-v*.*.*"
+
+permissions:
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    defaults:
+      run:
+        working-directory: providers/openfeature
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      # Deliberately installs switchbox-flags from PyPI (not the local
+      # checkout): a provider release must work against the core users
+      # actually get, not unpublished local changes.
+      - name: Install package (with dev deps)
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        run: pytest -q
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: providers/openfeature/dist
