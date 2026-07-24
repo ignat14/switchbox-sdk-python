@@ -46,6 +46,7 @@ class Switchbox:
         cdn_url = f"{base}/{sdk_key}/flags.json"
         self._cache = FlagCache()
         self._on_evaluation = on_evaluation
+        self._on_error = on_error
         self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error, timeout=timeout)
 
         # Anonymous usage telemetry (MEASUREMENT Phase 1 / ADR-055): on by
@@ -93,9 +94,19 @@ class Switchbox:
         if self._on_evaluation is not None:
             try:
                 self._on_evaluation(flag_key, result, user)
-            except Exception:
-                pass  # a caller's hook must never break evaluation (ADR-043)
+            except Exception as exc:
+                # a caller's hook must never break evaluation (ADR-043) —
+                # surfaced through on_error so the failure isn't invisible
+                self._report_hook_error(exc)
         return result
+
+    def _report_hook_error(self, exc: Exception) -> None:
+        """Surface a caller-supplied hook's exception via on_error (never raise)."""
+        if self._on_error is not None:
+            try:
+                self._on_error(exc)
+            except Exception:
+                pass  # the on_error callback itself must never break evaluation
 
     def enabled(self, flag_key: str, user: dict | None = None) -> bool:
         """Check if a boolean flag is enabled for a user.

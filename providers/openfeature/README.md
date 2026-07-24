@@ -6,7 +6,7 @@
 
 A thin provider that plugs Switchbox into the vendor-neutral OpenFeature API. Your app codes against OpenFeature; Switchbox is one constructor line. Swap vendors by swapping the provider, not your call sites. That is the point: no lock-in.
 
-The provider contains zero evaluation logic. It wraps [switchbox-flags](https://pypi.org/project/switchbox-flags/), which fetches static JSON from a CDN and evaluates rules locally in your process. Nothing about the architecture changes: same 30 second polling, same local evaluation, same deterministic rollouts. Every resolve is a direct in-process call, so evaluation costs zero network.
+The provider contains zero evaluation logic. It wraps [switchbox-flags](https://pypi.org/project/switchbox-flags/), which fetches static JSON from a CDN and evaluates rules locally in your process. Nothing about the architecture changes: same 10 second polling, same local evaluation, same deterministic rollouts. Every resolve is a direct in-process call, so evaluation costs zero network.
 
 ## Install
 

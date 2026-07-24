@@ -187,6 +187,32 @@ def test_client_on_evaluation_error_never_breaks_eval(mock_urlopen):
     def boom(*args):
         raise RuntimeError("hook exploded")
 
-    client = Switchbox(sdk_key=TEST_SDK_KEY, cdn_base_url=TEST_CDN, on_evaluation=boom)
+    errors = []
+    client = Switchbox(
+        sdk_key=TEST_SDK_KEY,
+        cdn_base_url=TEST_CDN,
+        on_evaluation=boom,
+        on_error=errors.append,
+    )
     assert client.enabled("new_dashboard", {"user_id": "1"}) is True  # ADR-043
+    # the hook failure is surfaced through on_error, not swallowed silently
+    assert len(errors) == 1 and str(errors[0]) == "hook exploded"
+    client.close()
+
+
+@patch("switchbox.sync.urllib.request.urlopen")
+def test_client_on_evaluation_error_safe_without_on_error(mock_urlopen):
+    from unittest.mock import MagicMock
+
+    resp = MagicMock()
+    resp.read.return_value = json.dumps(SAMPLE_CONFIG).encode("utf-8")
+    resp.__enter__ = lambda s: s
+    resp.__exit__ = MagicMock(return_value=False)
+    mock_urlopen.return_value = resp
+
+    def boom(*args):
+        raise RuntimeError("hook exploded")
+
+    client = Switchbox(sdk_key=TEST_SDK_KEY, cdn_base_url=TEST_CDN, on_evaluation=boom)
+    assert client.enabled("new_dashboard", {"user_id": "1"}) is True  # no on_error set
     client.close()

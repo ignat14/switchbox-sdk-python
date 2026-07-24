@@ -34,7 +34,7 @@ client.close()
 - **CDN-first** — fetches flag configs from static JSON on a CDN, no server in the read path
 - **Zero dependencies** — Python stdlib only, nothing to install beyond the package
 - **Sub-millisecond evaluation** — rules and rollouts evaluated locally in-process
-- **Background polling** — syncs configs every 30 seconds (configurable)
+- **Background polling** — syncs configs every 10 seconds (configurable)
 - **Offline resilient** — keeps working on cached configs if the CDN is unreachable
 - **Thread-safe** — safe to use from multiple threads
 - **Context manager** — supports `with Switchbox(...) as client:` for automatic cleanup
@@ -122,12 +122,29 @@ with Switchbox(sdk_key="your-sdk-key-from-dashboard") as client:
 # client.close() is called automatically
 ```
 
+### Analytics / exposure tracking
+
+Wire evaluations into your own analytics with `on_evaluation` — it fires after every evaluation with the flag key, the resolved value, and the user context. An exception inside your handler never breaks the flag check; it is reported through `on_error`:
+
+```python
+def on_evaluation(flag_key, value, user):
+    analytics.track("flag_evaluated", {"flag": flag_key, "value": value})
+
+client = Switchbox(sdk_key="your-sdk-key-from-dashboard", on_evaluation=on_evaluation)
+```
+
+Ready-made handlers for common analytics tools are in the [docs recipe](https://switchbox.dev/docs/recipes/measure-in-your-analytics).
+
+### Anonymous usage telemetry
+
+The SDK reports anonymous aggregate usage from a background thread — per-flag evaluation counts and value distribution, no identity, no user context — which powers the dashboard's flag usage panel. On by default; pass `telemetry=False` to disable it. Exactly what is sent and shown: [Connection & usage](https://switchbox.dev/docs/dashboard/monitoring).
+
 ## Configuration
 
 ```python
 client = Switchbox(
     sdk_key="your-sdk-key-from-dashboard",  # required — get from Environments tab
-    poll_interval=60,                       # seconds between polls (default: 30)
+    poll_interval=60,                       # seconds between polls (default: 10)
     on_error=lambda e: logger.warning(e),   # called on fetch errors (default: None)
     block_on_init=True,                     # block on the first fetch (default: True)
 )
@@ -136,10 +153,12 @@ client = Switchbox(
 | Parameter       | Type                           | Default | Description                                    |
 |-----------------|--------------------------------|---------|------------------------------------------------|
 | `sdk_key`       | `str`                          | —       | SDK key from the environment in the dashboard  |
-| `poll_interval` | `int`                          | `30`    | Seconds between background config refreshes    |
-| `on_error`      | `Callable[[Exception], None]`  | `None`  | Callback invoked when a fetch or parse fails   |
+| `poll_interval` | `int`                          | `10`    | Seconds between background config refreshes    |
+| `on_error`      | `Callable[[Exception], None]`  | `None`  | Callback invoked when a fetch or parse fails, or your `on_evaluation` hook raises |
 | `timeout`       | `int`                          | `10`    | Per-fetch HTTP timeout in seconds              |
 | `block_on_init` | `bool`                         | `True`  | Fetch the first config synchronously (see below) |
+| `telemetry`     | `bool`                         | `True`  | Anonymous usage telemetry; `False` disables it |
+| `on_evaluation` | `Callable \| None`             | `None`  | Callback `(flag_key, value, user)` on every evaluation |
 
 The SDK builds the CDN URL automatically from the SDK key. You can override with `cdn_base_url` if self-hosting.
 
@@ -189,14 +208,14 @@ blocks on the first fetch, while `new Switchbox(...)` without awaiting `init()` 
 
 1. You create and toggle flags in the dashboard or API
 2. On every change, the API generates a static JSON file and uploads it to Cloudflare R2
-3. This SDK polls that JSON file from the CDN every 30 seconds
+3. This SDK polls that JSON file from the CDN every 10 seconds
 4. Flag evaluation (rules, rollouts) happens locally — no network call per flag check
 
 The API server is only in the write path. All read traffic goes to the CDN.
 
 ## API Reference
 
-### `Switchbox(sdk_key, poll_interval=30, on_error=None, timeout=10, block_on_init=True)`
+### `Switchbox(sdk_key, poll_interval=10, on_error=None, timeout=10, block_on_init=True, telemetry=True, on_evaluation=None)`
 
 Creates a new client and starts background polling. With `block_on_init=True` (default) it performs an
 initial **synchronous** fetch on creation (the client is `ready` on return); with `block_on_init=False`
