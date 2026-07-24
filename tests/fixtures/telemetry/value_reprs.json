@@ -1,0 +1,25 @@
+{
+  "description": "MEASUREMENT Phase 1 / ADR-055 — cross-SDK telemetry value-repr contract. Both SDKs' aggregators bucket resolved flag values by a canonical string key (compact, key-sorted JSON). Each case: the resolved value -> the expected repr string. Pinned here so switchbox-sdk-python `value_repr` and switchbox-sdk-js `valueRepr` never diverge. Carries no evaluation logic (outside the sdk-parity evaluator scope) but the emitted shape must match.",
+  "max_values_per_flag": 10,
+  "other_bucket": "$other",
+  "cases": [
+    { "value": true, "repr": "true" },
+    { "value": false, "repr": "false" },
+    { "value": "A", "repr": "\"A\"" },
+    { "value": "", "repr": "\"\"" },
+    { "value": "hello world", "repr": "\"hello world\"" },
+    { "value": 42, "repr": "42" },
+    { "value": 0, "repr": "0" },
+    { "value": -1, "repr": "-1" },
+    { "value": 3.5, "repr": "3.5" },
+    { "value": null, "repr": "null" },
+    { "value": { "b": 1, "a": 2 }, "repr": "{\"a\":2,\"b\":1}" },
+    { "value": [1, 2, 3], "repr": "[1,2,3]" },
+    { "value": { "nested": { "y": 1, "x": 2 } }, "repr": "{\"nested\":{\"x\":2,\"y\":1}}" },
+    { "value": "$other", "repr": "\"$other\"" },
+    { "value": "café", "repr": "\"café\"" },
+    { "value": "日本語", "repr": "\"日本語\"" },
+    { "value": "🎉", "repr": "\"🎉\"" },
+    { "value": { "café": "naïve" }, "repr": "{\"café\":\"naïve\"}" }
+  ]
+}

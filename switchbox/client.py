@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from switchbox._version import __version__
 from switchbox.cache import FlagCache
 from switchbox.evaluator import evaluate
 from switchbox.sync import SyncWorker
+from switchbox.telemetry import TelemetryAggregator, TelemetryReporter
 
 CDN_BASE_URL = "https://cdn.switchbox.dev"
+SDK_NAME = "switchbox-python"
 
 
 class Switchbox:
@@ -31,16 +34,36 @@ class Switchbox:
     def __init__(
         self,
         sdk_key: str,
-        poll_interval: int = 30,
+        poll_interval: int = 10,
         on_error: Callable[[Exception], None] | None = None,
         timeout: int = 10,
         cdn_base_url: str | None = None,
         block_on_init: bool = True,
+        telemetry: bool = True,
+        on_evaluation: Callable[[str, Any, dict | None], None] | None = None,
     ) -> None:
         base = cdn_base_url or CDN_BASE_URL
         cdn_url = f"{base}/{sdk_key}/flags.json"
         self._cache = FlagCache()
+        self._on_evaluation = on_evaluation
         self._sync = SyncWorker(cdn_url, self._cache, poll_interval, on_error, timeout=timeout)
+
+        # Anonymous usage telemetry (MEASUREMENT Phase 1 / ADR-055): on by
+        # default, `telemetry=False` opts out. Counts evaluations locally and
+        # flushes an aggregate summary to the CDN worker's ingest route on its
+        # own ~60s cadence. Env key only — never identity/context. Fail-open.
+        self._telemetry: TelemetryAggregator | None = None
+        self._reporter: TelemetryReporter | None = None
+        if telemetry:
+            self._telemetry = TelemetryAggregator()
+            self._reporter = TelemetryReporter(
+                f"{base}/{sdk_key}/telemetry",
+                self._telemetry,
+                SDK_NAME,
+                __version__,
+            )
+            self._reporter.start()
+
         # block_on_init=True (default): the constructor performs the first fetch
         # synchronously, so the client is `ready` on return. Set False to fetch in
         # the background instead — the constructor returns immediately and never
@@ -56,12 +79,23 @@ class Switchbox:
         """Look up a flag and evaluate it, returning *fallback* if it's absent.
 
         The shared path behind enabled()/get_value() — they differ only in
-        their fallback and how they coerce the result.
+        their fallback and how they coerce the result. Records usage telemetry
+        (real evaluations only, not absent-flag fallbacks) and fires the
+        ``on_evaluation`` hook (always, matching the JS SDK).
         """
         flag = self._cache.get_flag(flag_key)
         if flag is None:
-            return fallback
-        return evaluate(flag, user)
+            result = fallback
+        else:
+            result = evaluate(flag, user)
+            if self._telemetry is not None:
+                self._telemetry.record(flag_key, result)
+        if self._on_evaluation is not None:
+            try:
+                self._on_evaluation(flag_key, result, user)
+            except Exception:
+                pass  # a caller's hook must never break evaluation (ADR-043)
+        return result
 
     def enabled(self, flag_key: str, user: dict | None = None) -> bool:
         """Check if a boolean flag is enabled for a user.
@@ -87,8 +121,10 @@ class Switchbox:
         return {key: evaluate(flag, user) for key, flag in config.flags.items()}
 
     def close(self) -> None:
-        """Stop the background sync. Call on shutdown."""
+        """Stop the background sync + telemetry. Call on shutdown."""
         self._sync.stop()
+        if self._reporter is not None:
+            self._reporter.stop()  # final best-effort telemetry flush
 
     def __enter__(self) -> Switchbox:
         return self

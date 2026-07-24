@@ -20,7 +20,7 @@ class SyncWorker:
         self,
         cdn_url: str,
         cache: FlagCache,
-        interval: int = 30,
+        interval: int = 10,
         on_error: Callable[[Exception], None] | None = None,
         timeout: int = 10,
     ) -> None:
