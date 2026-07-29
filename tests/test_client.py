@@ -28,10 +28,11 @@ SAMPLE_CONFIG = {
 }
 
 
-def _mock_urlopen(data):
+def _mock_urlopen(data, etag=None):
     """Create a mock that mimics urllib.request.urlopen response."""
     resp = MagicMock()
     resp.read.return_value = json.dumps(data).encode("utf-8")
+    resp.headers.get.return_value = etag
     resp.__enter__ = lambda s: s
     resp.__exit__ = MagicMock(return_value=False)
     return resp
@@ -140,6 +141,83 @@ def test_client_close_stops_sync(mock_urlopen):
     c = Switchbox(sdk_key=TEST_SDK_KEY, cdn_base_url=TEST_CDN)
     c.close()
     assert c._sync._stop_event.is_set()
+
+
+# --- REF-8: conditional fetch (ETag / If-None-Match) ---
+
+
+def _sent_if_none_match(mock_urlopen, call_index):
+    """The If-None-Match header on the nth urlopen call (urllib capitalizes it)."""
+    request = mock_urlopen.call_args_list[call_index][0][0]
+    return request.get_header("If-none-match")
+
+
+@patch("switchbox.sync.urllib.request.urlopen")
+def test_first_fetch_has_no_validator_then_echoes_the_etag(mock_urlopen):
+    """Nothing to validate against on the first fetch; every poll after it sends
+    the ETag back so an unchanged config costs no payload."""
+    mock_urlopen.return_value = _mock_urlopen(SAMPLE_CONFIG, etag='"abc"')
+    with Switchbox(
+        sdk_key=TEST_SDK_KEY, cdn_base_url=TEST_CDN, poll_interval=9999
+    ) as client:
+        assert _sent_if_none_match(mock_urlopen, 0) is None
+        client._sync._poll()
+        assert _sent_if_none_match(mock_urlopen, 1) == '"abc"'
+
+
+@patch("switchbox.sync.urllib.request.urlopen")
+def test_304_keeps_the_cached_config_and_is_not_an_error(mock_urlopen):
+    """urllib raises on any non-2xx, but a 304 is the success case: config
+    unchanged, cache kept, no on_error callback."""
+    from urllib.error import HTTPError
+
+    errors = []
+    mock_urlopen.return_value = _mock_urlopen(SAMPLE_CONFIG, etag='"abc"')
+    with Switchbox(
+        sdk_key=TEST_SDK_KEY,
+        cdn_base_url=TEST_CDN,
+        poll_interval=9999,
+        on_error=errors.append,
+    ) as client:
+        version = client._cache.get_version()
+        mock_urlopen.side_effect = HTTPError(TEST_CDN, 304, "Not Modified", {}, None)
+        client._sync._poll()
+
+        assert client._cache.get_version() == version
+        assert client.enabled("new_dashboard", user={"user_id": "1"}) is True
+        assert errors == []
+
+
+@patch("switchbox.sync.urllib.request.urlopen")
+def test_an_unparsed_body_does_not_leave_a_validator_behind(mock_urlopen):
+    """A 200 whose body never reaches the cache must not have its ETag
+    remembered: sending that validator back would earn a 304 forever, freezing
+    the client on defaults until the next publish. Kept identical to the JS SDK."""
+    # Valid JSON, wrong shape — parsed, then fails on the way to the cache.
+    mock_urlopen.return_value = _mock_urlopen([], etag='"broken"')
+    client = Switchbox(
+        sdk_key=TEST_SDK_KEY, cdn_base_url=TEST_CDN, poll_interval=9999
+    )
+    assert client.ready is False
+
+    mock_urlopen.return_value = _mock_urlopen(SAMPLE_CONFIG, etag='"abc"')
+    client._sync._poll()
+    assert _sent_if_none_match(mock_urlopen, 1) is None
+    # …so the retry is a full fetch and the client recovers.
+    assert client.enabled("new_dashboard", user={"user_id": "1"}) is True
+    client.close()
+
+
+@patch("switchbox.sync.urllib.request.urlopen")
+def test_a_cdn_without_etags_is_never_sent_a_validator(mock_urlopen):
+    """Local nginx / the cdn_output fallback issue no ETag — we must not send a
+    validator the current CDN never handed us."""
+    mock_urlopen.return_value = _mock_urlopen(SAMPLE_CONFIG)
+    with Switchbox(
+        sdk_key=TEST_SDK_KEY, cdn_base_url=TEST_CDN, poll_interval=9999
+    ) as client:
+        client._sync._poll()
+        assert _sent_if_none_match(mock_urlopen, 1) is None
 
 
 # --- SEC-9: block_on_init ---

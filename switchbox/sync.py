@@ -31,6 +31,10 @@ class SyncWorker:
         self._timeout = timeout
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        # Last ETag the CDN gave us, echoed back as If-None-Match (REF-8). Only
+        # ever touched from the polling thread (the blocking first fetch runs
+        # before that thread starts), so no lock is needed.
+        self._etag: str | None = None
 
     def start(self, block: bool = True) -> None:
         """Start polling. Fetch the first config, then poll in the background.
@@ -85,24 +89,46 @@ class SyncWorker:
     def _poll(self) -> None:
         """Fetch config from CDN, parse, and update cache if changed."""
         try:
-            req = urllib.request.Request(
-                self._cdn_url,
-                headers={"User-Agent": f"switchbox-python/{__version__}"},
-            )
+            headers = {"User-Agent": f"switchbox-python/{__version__}"}
+            # Conditional fetch (REF-8): once we hold a config, ask the CDN to
+            # answer 304-with-no-body unless it actually changed, so steady-state
+            # polling costs no payload. Degrades to a plain 200 on any CDN that
+            # doesn't send ETags (local nginx, the cdn_output/ fallback).
+            if self._etag:
+                headers["If-None-Match"] = self._etag
+            req = urllib.request.Request(self._cdn_url, headers=headers)
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                etag = resp.headers.get("ETag")
                 data = json.loads(resp.read().decode("utf-8"))
+            # None when the CDN sends no ETag, so we never send a validator it
+            # didn't issue. Committed to self._etag only once the config it
+            # describes is in the cache (below): storing it for a body we failed
+            # to parse would make every later poll a 304 we skip — wedging the
+            # client on defaults until the next publish changes the ETag.
+            etag = etag if isinstance(etag, str) else None
 
             # Skip parsing if version hasn't changed
             new_version = data.get("version", "")
             current_version = self._cache.get_version()
             if current_version and new_version == current_version:
+                self._etag = etag
                 return
 
             config = FlagConfig.from_dict(data)
             self._cache.set_config(config)
+            self._etag = etag
             logger.debug("Updated flag config to version %s", config.version)
 
         except urllib.error.HTTPError as exc:
+            # HTTPError *is* the response object, holding the connection open
+            # until it's collected — and since REF-8 a 304 is the steady-state
+            # path, not a rare error, so release it explicitly.
+            exc.close()
+            if exc.code == 304:
+                # Config unchanged (REF-8) — nothing to download or parse, the
+                # cache stays as-is. urllib raises on any non-2xx, so this is a
+                # success path, not an error: no on_error callback.
+                return
             self._handle_error(f"HTTP error {exc.code} {exc.reason}", exc)
         except urllib.error.URLError as exc:
             self._handle_error(f"URL error: {exc.reason}", exc)
