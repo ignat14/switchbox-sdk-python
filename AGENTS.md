@@ -9,12 +9,16 @@ This repository contains the zero-runtime-dependency `switchbox-flags` SDK and t
 Run commands from the repository root unless noted otherwise.
 
 ```sh
+python3 -m venv .venv
+. .venv/bin/activate
 python -m pip install -e ".[dev]"
 python -m pip install -e providers/openfeature
 ruff check .
-pytest -v --cov=switchbox --cov-report=term-missing --cov-fail-under=80
-pytest providers/openfeature/tests -q
+python -m pytest -v --cov=switchbox --cov-report=term-missing --cov-fail-under=80
+python -m pytest providers/openfeature/tests -q
 ```
+
+Format changed Python files with `ruff format <paths>` and check them with `ruff format --check <paths>`. CI currently runs `ruff check .`, not a whole-tree formatter check, so avoid unrelated formatting churn.
 
 Build the distributions with:
 
